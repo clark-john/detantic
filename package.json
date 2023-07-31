@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "workspaces": [
+    "core",
+    "eslint-config"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "core": "yarn workspace detantic"
+  }
+}
