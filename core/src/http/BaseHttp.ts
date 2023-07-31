@@ -20,6 +20,13 @@ export class BaseHttp extends RequestSender {
 	async queryItems<T>(
 		req: QueryItemsRequest<T>
 	): Promise<QueryResponse<BaseModelWithKey<T>>> {
+		req.query?.map(x => {
+			if ((x as { id: string }).id) {
+				return idToKey(x as any);
+			} else {
+				return x;
+			}
+		});
 		return await this.post("/query", { body: req });
 	}
 

@@ -89,13 +89,17 @@ export class Model<T extends BaseModel> {
 	/**
 	 * Find several items by query
 	 */
-	async findMany(obj: Partial<T> = {}, options?: { limit: number }) {
+	async findMany(obj: Partial<T> = {}, options?: { limit: number }): ModelReturn<T[]> {
+		const errs = await this.validate(obj, true);
 		const opts = { query: [obj] };
+		if (errs.length) {
+			return [null, errs];
+		}
 		if (options?.limit) {
 			set(opts, "limit", options.limit);
 		}
 		const items = (await this.http.queryItems(opts)).items;
-		return items.map(x => keyToId(x));
+		return [items.map<T>(x => keyToId(x) as T), null];
 	}
 
 	/**
