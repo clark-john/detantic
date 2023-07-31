@@ -1,6 +1,6 @@
 {
   "name": "detantic",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "license": "MIT",
   "main": "./dist/src/index.js",
   "author": {
