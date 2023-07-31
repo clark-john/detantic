@@ -1,7 +1,8 @@
 {
   "name": "detantic",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "license": "MIT",
+  "main": "./dist/src/index.js",
   "author": {
     "name": "John Clark",
     "email": "mjohncl4rk@gmail.com"
@@ -9,10 +10,10 @@
   "files": [
     "./dist/src"
   ],
+  "types": "./dist/src/index.d.ts",
   "repository": {
     "url": "https://github.com/clark-john/detantic"
   },
-  "types": "./dist/index.d.ts",
   "scripts": {
     "prebuild": "yarn lint",
     "build": "tsc",
