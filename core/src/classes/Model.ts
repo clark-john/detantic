@@ -3,17 +3,16 @@ import { BaseModel } from "./BaseModel";
 import { randomUUID } from "crypto";
 import { BaseHttp } from "../http/BaseHttp";
 import { keyToId } from "../utils";
-import { isEmpty, isEqual, merge, set } from "lodash";
+import { isEqual, merge, set } from "lodash";
+import { ValidationError } from "../errors/ValidationError";
+import { ModelErrors } from "src/types";
 
-type ModelErrors = Record<string, any>[];
 type NoId<T extends BaseModel> = Omit<T, "id">;
 type ValidateObj<T extends BaseModel> =
 	| T
 	| Partial<T>
 	| NoId<T>
 	| Partial<NoId<T>>;
-
-type ModelReturn<T> = Promise<[T | null, ModelErrors | ModelErrors[] | null]>;
 
 /**
  * A class used to manage a base with some extended functions.
@@ -30,7 +29,7 @@ export class Model<T extends BaseModel> {
 	/**
 	 * Insert a single item
 	 */
-	async insert(obj: NoId<T>, id?: string): ModelReturn<T> {
+	async insert(obj: NoId<T>, id?: string): Promise<T> {
 		const o = obj as T;
 		o.id = randomUUID();
 		if (id) {
@@ -38,49 +37,45 @@ export class Model<T extends BaseModel> {
 		}
 		const errors = await this.validate(o);
 		if (errors.length) {
-			return [null, errors];
+			throw new ValidationError(errors);
 		}
-		return [keyToId(await this.http.insertItem(o)), null];
+		return keyToId(await this.http.insertItem(o));
 	}
 
 	/**
 	 * Insert several items at the same time
 	 */
-	async insertMany(items: NoId<T>[]): ModelReturn<T[]> {
-		const errors = await this.validateItems(items);
+	async insertMany(items: NoId<T>[]): Promise<T[]> {
+		const valproms: Promise<any>[] = [];
 
 		items.forEach(x => {
 			(x as T).id = randomUUID();
+			valproms.push(this.validate(x));
 		});
 
-		if (errors.some(x => isEmpty(x))) {
-			return [
-				(await this.http.putItems(items as T[])).processed.items.map(x =>
-					keyToId(x as T)
-				),
-				null
-			];
-		} else {
-			return [null, errors];
-		}
+		await Promise.all(valproms);
+
+		return (await this.http.putItems(items as T[])).processed.items.map(x =>
+			keyToId(x as T)
+		);
 	}
 
 	/**
 	 * Find single item using a query
 	 */
-	async findOne(obj: Partial<T> = {}): ModelReturn<T | object> {
+	async findOne(obj: Partial<T> = {}): Promise<T | Record<string, never>> {
 		const errs = await this.validate(obj, true);
 		if (isEqual(obj, {})) {
-			return [{}, null];
+			return {};
 		}
 		if (errs.length) {
-			return [null, errs];
+			throw new ValidationError(errs as any);
 		}
 		const item = (
 			await this.http.queryItems({ query: [obj], limit: 1 })
 		).items.at(0);
 		if (item) {
-			return [keyToId(item), null];
+			return keyToId(item) as T;
 		} else {
 			throw new Error("Item not found");
 		}
@@ -89,17 +84,17 @@ export class Model<T extends BaseModel> {
 	/**
 	 * Find several items by query
 	 */
-	async findMany(obj: Partial<T> = {}, options?: { limit: number }): ModelReturn<T[]> {
+	async findMany(obj: Partial<T> = {}, options?: { limit: number }): Promise<T[]> {
 		const errs = await this.validate(obj, true);
 		const opts = { query: [obj] };
 		if (errs.length) {
-			return [null, errs];
+			throw new ValidationError(errs);
 		}
 		if (options?.limit) {
 			set(opts, "limit", options.limit);
 		}
 		const items = (await this.http.queryItems(opts)).items;
-		return [items.map<T>(x => keyToId(x) as T), null];
+		return items.map<T>(x => keyToId(x) as T);
 	}
 
 	/**
@@ -114,11 +109,11 @@ export class Model<T extends BaseModel> {
 	/**
 	 * Delete items at the same time in a single query
 	 */
-	async deleteMany(query: Partial<T>): ModelReturn<T[]> {
+	async deleteMany(query: Partial<T>): Promise<T[]> {
 		const errs = await this.validate(query, true);
 
-		if (errs) {
-			return [null, errs];
+		if (errs.length) {
+			throw new ValidationError(errs as ModelErrors[]);
 		}
 
 		const deleteProms = [];
@@ -130,7 +125,7 @@ export class Model<T extends BaseModel> {
 			itemsToReturn.push(keyToId(x) as T);
 		});
 
-		return [itemsToReturn, null];
+		return itemsToReturn;
 	}
 
 	/**
@@ -144,8 +139,9 @@ export class Model<T extends BaseModel> {
 
 		const errs = await this.validate(obj, true);
 		console.log(errs);
+
 		if (errs.length) {
-			return errs;
+			throw new ValidationError(errs as any);
 		}
 
 		await this.http.updateItem(obj, id);
@@ -158,13 +154,13 @@ export class Model<T extends BaseModel> {
 	async updateMany(
 		query: Partial<T>,
 		updates: Partial<NoId<T>>
-	): ModelReturn<T[]> {
+	): Promise<T[]> {
 		const updateProms: Promise<any>[] = [];
 
 		const errs = await this.validate(query, true);
 
 		if (errs.length) {
-			return [null, errs];
+			throw new ValidationError(errs);
 		}
 
 		const { items } = await this.http.queryItems({ query: [query] });
@@ -178,7 +174,7 @@ export class Model<T extends BaseModel> {
 
 		await Promise.all(updateProms);
 
-		return [itemsToReturn, null];
+		return itemsToReturn;
 	}
 
 	/**
@@ -187,11 +183,11 @@ export class Model<T extends BaseModel> {
 	private validate(
 		obj: ValidateObj<T>,
 		partial: boolean = false
-	): Promise<ModelErrors> {
+	): Promise<ModelErrors[]> {
 		const modelInst = this.classSchema;
 		Object.assign(modelInst, obj);
 
-		const errors: ModelErrors = [];
+		const errors: ModelErrors[] = [];
 
 		return new Promise(res => {
 			validate(modelInst, {
@@ -201,24 +197,13 @@ export class Model<T extends BaseModel> {
 			}).then(errs => {
 				errs.forEach(x => {
 					if (x.constraints) {
-						const obj = x.constraints;
+						const obj = x.constraints as ModelErrors;
 						obj.property = x.property;
-						errors.push(x.constraints);
+						errors.push(obj);
 					}
 				});
 				res(errors);
 			});
 		});
-	}
-
-	/**
-	 * Validate two or more items, it uses the private function validate
-	 */
-	private async validateItems(items: any[]) {
-		const errors: ModelErrors[] = [];
-		for (const x of items) {
-			errors.push(await this.validate(x));
-		}
-		return errors;
 	}
 }

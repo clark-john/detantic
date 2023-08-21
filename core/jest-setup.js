@@ -1,6 +1,4 @@
-import { config } from 'dotenv';
-
-console.warn("No test files");
+const { config } = require('dotenv');
 
 config({
 	path: "./.env.test"

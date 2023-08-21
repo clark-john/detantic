@@ -1,6 +1,6 @@
 # Detantic
 
-A better TypeScript SDK for Deta. (built first for [takenotes](https://github.com/clark-john/takenotes) backend.)
+A better SDK for Deta. (built first for [takenotes](https://github.com/clark-john/takenotes) backend.) 
 
 ### Features:
 

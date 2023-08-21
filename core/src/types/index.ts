@@ -8,3 +8,8 @@ export interface UploadFileOptions {
 	directory?: string;
 	data: Buffer;
 }
+
+export interface ModelErrors {
+	[key: string]: any
+	property: string;
+}

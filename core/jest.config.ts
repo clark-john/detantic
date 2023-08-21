@@ -10,12 +10,14 @@ const config: Config = {
     "./jest-setup.js"
   ],
   testMatch: [
-    "**/__tests__/**/*.[jt]s?(x)",
-    "**/?(*.)+(spec|test).[tj]s?(x)"
+    "**/__tests__/**/*.ts",
+    "**/?(*.)+(spec|test).ts"
   ],
   testPathIgnorePatterns: [
     "\\\\node_modules\\\\"
   ],
+  testEnvironment: "node",
+  preset: "ts-jest"
 };
 
 export default config;
