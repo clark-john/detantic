@@ -68,12 +68,15 @@ export class Model<T extends BaseModel> {
 		if (isEqual(obj, {})) {
 			return {};
 		}
+		
 		if (errs.length) {
 			throw new ValidationError(errs as any);
 		}
+
 		const item = (
 			await this.http.queryItems({ query: [obj], limit: 1 })
 		).items.at(0);
+
 		if (item) {
 			return keyToId(item) as T;
 		} else {
@@ -135,8 +138,6 @@ export class Model<T extends BaseModel> {
 		obj: Partial<NoId<T>>,
 		id: string
 	): Promise<T | ModelErrors> {
-		const mainObj = keyToId(await this.http.getByKey(id));
-
 		const errs = await this.validate(obj, true);
 		console.log(errs);
 
@@ -144,8 +145,12 @@ export class Model<T extends BaseModel> {
 			throw new ValidationError(errs as any);
 		}
 
-		await this.http.updateItem(obj, id);
-		return merge(mainObj, obj) as T;
+		const [mainObj] = await Promise.all([
+			this.http.getByKey(id),
+			this.http.updateItem(obj, id)
+		]);
+
+		return merge(keyToId(mainObj), obj) as T;
 	}
 
 	/**

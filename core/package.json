@@ -10,6 +10,11 @@
   "files": [
     "./dist/src"
   ],
+  "keywords": [
+    "deta",
+    "orm",
+    "validation"
+  ],
   "types": "./dist/src/index.d.ts",
   "repository": {
     "url": "https://github.com/clark-john/detantic"
