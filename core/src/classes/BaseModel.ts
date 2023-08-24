@@ -10,8 +10,9 @@ export class BaseModel {
 
 	/**
 	 * static function used to return a new instance itself
+	 * @deprecated
 	 */
 	static createSchema() {
-		return new this();
+		return new this;
 	}
 }

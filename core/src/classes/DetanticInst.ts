@@ -16,7 +16,7 @@ export class DetanticInst {
 	/**
 	 * a function used to create a model together with its schema.
 	 */
-	createModel<T extends BaseModel>(base: string, classInst: BaseModel) {
+	createModel<T extends BaseModel>(base: string, classInst: T) {
 		return new Model<T>(classInst, new BaseHttp(base, this.key));
 	}
 

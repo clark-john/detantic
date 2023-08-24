@@ -14,6 +14,12 @@ type ValidateObj<T extends BaseModel> =
 	| NoId<T>
 	| Partial<NoId<T>>;
 
+// objectData can be a value from Model's findOne
+interface ModifyOptions<T> { 
+	fetchId: boolean, 
+	objectData?: Partial<T> | null
+}
+
 /**
  * A class used to manage a base with some extended functions.
  */
@@ -55,20 +61,19 @@ export class Model<T extends BaseModel> {
 
 		await Promise.all(valproms);
 
-		return (await this.http.putItems(items as T[])).processed.items.map(x =>
-			keyToId(x as T)
-		);
+		return (await this.http.putItems(items as T[])).processed.items.map(x => keyToId(x));
 	}
 
 	/**
 	 * Find single item using a query
 	 */
-	async findOne(obj: Partial<T> = {}): Promise<T | Record<string, never>> {
+	async findOne(obj: Partial<T> = {}): Promise<T | null> {
 		const errs = await this.validate(obj, true);
+
 		if (isEqual(obj, {})) {
-			return {};
+			return null;
 		}
-		
+
 		if (errs.length) {
 			throw new ValidationError(errs as any);
 		}
@@ -80,7 +85,7 @@ export class Model<T extends BaseModel> {
 		if (item) {
 			return keyToId(item) as T;
 		} else {
-			throw new Error("Item not found");
+			return null;
 		}
 	}
 
@@ -89,22 +94,42 @@ export class Model<T extends BaseModel> {
 	 */
 	async findMany(obj: Partial<T> = {}, options?: { limit: number }): Promise<T[]> {
 		const errs = await this.validate(obj, true);
+		
 		const opts = { query: [obj] };
+		
 		if (errs.length) {
 			throw new ValidationError(errs);
 		}
+		
 		if (options?.limit) {
 			set(opts, "limit", options.limit);
 		}
+
 		const items = (await this.http.queryItems(opts)).items;
-		return items.map<T>(x => keyToId(x) as T);
+		return items.map(x => keyToId(x) as T);
 	}
 
 	/**
-	 * Delete an item by key
+	 * Delete an item by key, returns an item deleted otherwise null if not found
 	 */
-	async deleteByKey(key: string) {
-		const item = keyToId(await this.http.getByKey(key));
+	async deleteById(key: string, options: ModifyOptions<T> = { fetchId: true }): Promise<T | null> {
+		const { fetchId, objectData } = options;
+		
+		let item: T;
+
+		if (!fetchId) {
+			if (!objectData) {
+				throw new Error("Object data is required if fetchId is false");
+			}
+			item = objectData as T;
+		} else {
+			try {
+				item = keyToId(await this.http.getByKey(key)) as T;
+			} catch (e) {
+				return null;
+			}
+		}
+
 		await this.http.deleteByKey(key);
 		return item;
 	}
@@ -135,22 +160,37 @@ export class Model<T extends BaseModel> {
 	 * update an item using a key
 	 */
 	async updateById(
-		obj: Partial<NoId<T>>,
-		id: string
-	): Promise<T | ModelErrors> {
-		const errs = await this.validate(obj, true);
-		console.log(errs);
+		updates: Partial<NoId<T>>,
+		id: string,
+		options: ModifyOptions<T> = { fetchId: true }
+	): Promise<T | null> {
+
+		const { fetchId, objectData } = options;
+		const errs = await this.validate(updates, true);
 
 		if (errs.length) {
 			throw new ValidationError(errs as any);
 		}
 
-		const [mainObj] = await Promise.all([
-			this.http.getByKey(id),
-			this.http.updateItem(obj, id)
-		]);
+		const proms: Promise<any>[] = [
+			this.http.updateItem(updates, id)
+		];
 
-		return merge(keyToId(mainObj), obj) as T;
+		if (fetchId) {
+			try {
+				proms.splice(0, 0, this.http.getByKey(id));
+			} catch (e) {
+				return null;
+			}
+		}
+
+		if (!fetchId && !objectData) {
+			throw new Error("Object data is required if fetchId is false");
+		}
+
+		const [mainObj] = await Promise.all(proms);
+
+		return merge(fetchId ? keyToId(mainObj) : objectData, updates) as T;
 	}
 
 	/**
