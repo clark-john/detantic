@@ -9,10 +9,10 @@ export class RequestSender {
 	constructor(key: string, urlCreator: (projectId?: string) => string) {
 		const [projectId] = key.split("_");
 
-		const headers = new Headers({
+		const headers = {
 			"Content-Type": "application/json",
 			"X-Api-Key": key
-		});
+		};
 
 		this.url = urlCreator(projectId);
 
